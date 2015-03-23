@@ -4,12 +4,11 @@
 #include "tinyxml/tinyxml.h"
 #include "tinyxml/tinyxmlerror.cpp"
 #include "tinyxml/tinyxmlparser.cpp"
+#include "md5.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
-string test;
 
-//Данные будем записывать в структуру, а структуру копировать в вектор
 struct Fileinfo {
 	string path;
 	string hash;
@@ -34,22 +33,29 @@ void save2xml(string filename, vector<Fileinfo> vec_finfo) {
 	doc.SaveFile(filename.c_str());
 }
 
-void get_dir_list(fs::directory_iterator iterator, vector<Fileinfo> * vec_finfo) {  //выводит список файлов и папок в директории
-	Fileinfo finfo; //объявление структуры, в которую будем записывать данные и складывать их в вектор
+void get_dir_list(fs::directory_iterator iterator, vector<Fileinfo> * vec_finfo) {  
+	Fileinfo finfo; 
 	for (; iterator != fs::directory_iterator(); ++iterator)
 	{
-		if (fs::is_directory(iterator->status())) { //если наткнулись на папку, то рекурсивно запускаем эту же функцию для этой папки
+		if (fs::is_directory(iterator->status())) { 
 			fs::directory_iterator sub_dir(iterator->path());
 			get_dir_list(sub_dir, vec_finfo);
+
 		}
-		else //а если нет, то записываем в структуру имя, размер, хеш, и флажок (понадобится чуть позже, когда будем искать изменения в файлах)
+		else
 		{
+			std::ifstream input;		
 			finfo.path = iterator->path().string();
 			finfo.size = fs::file_size(iterator->path());
-			finfo.hash = "hash";
+			input.open(finfo.path, std::ios_base::binary);
+			std::string content((std::istreambuf_iterator<char>(input)),
+				(std::istreambuf_iterator<char>()));
+			finfo.hash = md5(content);
 			finfo.flag = 'f';
 			vec_finfo->push_back(finfo);
+			input.close();
 		}
+
 	}
 }
 
@@ -57,22 +63,21 @@ int main() {
 	string path, dirpath;
 	cout << "Path:" << endl;
 	getline(cin, path);
-
-
 	cout << endl;
-	vector<Fileinfo> vec_finfo; //Вектор в который мы будем складывать объекты нашей структуры
+	vector<Fileinfo> vec_finfo;
 	fs::directory_iterator home_dir(path);
 	get_dir_list(home_dir, &vec_finfo);
 
-	//Выводим список файлов, размеров и т.д.:
 	for (Fileinfo element : vec_finfo) {
 		cout << element.path << endl <<
-			element.size << endl;
+			element.size << endl <<
+			element.hash << endl;
+		
 	}
+
 	save2xml("example.xml", vec_finfo);  //сохраняем полученное в хмл файле с именем example.xml, создастся он в папке где находится main.cpp
 	cin.clear();
 	fflush(stdin);
 	cin.get();
 	return 0;
 }
-
