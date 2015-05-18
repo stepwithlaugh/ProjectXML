@@ -41,11 +41,11 @@ vector<Fileinfo> compare_lists(vector<Fileinfo> newfl, vector<Fileinfo> oldfl) {
 	return newfl;
 }
 
-void saveToXml(string filename, vector<FileInfo> vec_finfo) {
+void saveToXml(string filename, vector<Fileinfo> vec_finfo) {
 	XMLDocument doc;
 	XMLDeclaration * decl = doc.NewDeclaration();
 	doc.LinkEndChild(decl);
-	for (FileInfo it : vec_finfo) {
+	for (Fileinfo it : vec_finfo) {
 		XMLElement * element = doc.NewElement("File");
 		doc.LinkEndChild(element);
 		element->SetAttribute("path", it.path.c_str());
@@ -59,8 +59,8 @@ void saveToXml(string filename, vector<FileInfo> vec_finfo) {
 	doc.SaveFile(filename.c_str());
 }
 
-void loadxml(string filename, vector<FileInfo> & vec_finfo) {
-	FileInfo it;
+void loadxml(string filename, vector<Fileinfo> & vec_finfo) {
+	Fileinfo it;
 	XMLDocument doc;
 	doc.LoadFile(filename.c_str());
 	XMLHandle docHandle(&doc);
