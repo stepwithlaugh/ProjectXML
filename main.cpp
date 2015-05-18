@@ -2,17 +2,18 @@
 #include <string>
 #include <fstream>
 #include <boost/filesystem.hpp>
-#include "tinyxml/tinyxml.h"
-#include "tinyxml/tinyxmlerror.cpp"
-#include "tinyxml/tinyxmlparser.cpp"
+#include "tinyxml2.h"
+#include "tinyxml2.cpp"
 #include "md5.h"
+#include "sha256.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
 
 struct Fileinfo {
 	string path;
-	string hash;
+	string md5;
+	string sha2;
 	int size;
 	string flag = "NEW";
 };
@@ -21,12 +22,12 @@ vector<Fileinfo> compare_lists(vector<Fileinfo> newfl, vector<Fileinfo> oldfl) {
 	for (vector<Fileinfo>::iterator itnew = newfl.begin(); itnew < newfl.end(); itnew++) {
 
 		for (vector<Fileinfo>::iterator itold = oldfl.begin(); itold < oldfl.end(); itold++) {
-			if ((itnew->path == itold->path) && (itnew->hash == itold->hash)) {
+			if ((itnew->path == itold->path) && (itnew->md5 == itold->md5) && (itnew->sha2 == itold->sha2)) {
 				itnew->flag = "UNCHANGED";
 				oldfl.erase(itold);
 				break;
 			}
-			if ((itnew->path == itold->path) && (itnew->hash != itold->hash)) {
+			if ((itnew->path == itold->path) && (itnew->md5 == itold->md5) || (itnew->sha2 == itold->sha2))  {
 				itnew->flag = "CHANGED";
 				oldfl.erase(itold);
 				break;
@@ -40,38 +41,41 @@ vector<Fileinfo> compare_lists(vector<Fileinfo> newfl, vector<Fileinfo> oldfl) {
 	return newfl;
 }
 
-void save2xml(string filename, vector<Fileinfo> vec_finfo) {
-	TiXmlDocument doc;
-	TiXmlDeclaration * decl = new TiXmlDeclaration("1.0", "", "");
+void saveToXml(string filename, vector<FileInfo> vec_finfo) {
+	XMLDocument doc;
+	XMLDeclaration * decl = doc.NewDeclaration();
 	doc.LinkEndChild(decl);
-	for (Fileinfo it : vec_finfo) {
-		TiXmlElement * element = new TiXmlElement("File");
+	for (FileInfo it : vec_finfo) {
+		XMLElement * element = doc.NewElement("File");
 		doc.LinkEndChild(element);
 		element->SetAttribute("path", it.path.c_str());
 		element->SetAttribute("size", it.size);
-		element->SetAttribute("hash", it.hash.c_str());
-		//element->SetAttribute("flag", it.flag);
-		TiXmlText * text = new TiXmlText("");
+		element->SetAttribute("md5", it.md5.c_str());
+		element->SetAttribute("sha256", it.sha2.c_str());
+		element->SetAttribute("flag", it.flag.c_str());
+		XMLText * text = doc.NewText(" ");
 		element->LinkEndChild(text);
 	}
 	doc.SaveFile(filename.c_str());
 }
 
-void loadxml(string filename, vector<Fileinfo> & vec_finfo) {
-	Fileinfo it;
-	TiXmlDocument doc;
+void loadxml(string filename, vector<FileInfo> & vec_finfo) {
+	FileInfo it;
+	XMLDocument doc;
 	doc.LoadFile(filename.c_str());
-	TiXmlHandle docHandle(&doc);
-	TiXmlElement* child = docHandle.FirstChild("File").ToElement();
+	XMLHandle docHandle(&doc);
+	XMLElement* child = docHandle.FirstChildElement("File").ToElement();
 	for (child; child; child = child->NextSiblingElement())
 	{
 
 		it.size = atoi(child->Attribute("size"));
-		it.hash = child->Attribute("hash");
+		it.md5 = child->Attribute("md5");
+		it.sha256 = child->Attribute("sha256");
 		it.path = child->Attribute("path");
 		vec_finfo.push_back(it);
 	}
 }
+
 
 void get_dir_list(fs::directory_iterator iterator, vector<Fileinfo> & vec_finfo, Fileinfo & finfo, ifstream & ifs) {
 	for (; iterator != fs::directory_iterator(); ++iterator)
@@ -90,7 +94,9 @@ void get_dir_list(fs::directory_iterator iterator, vector<Fileinfo> & vec_finfo,
 			ifs.open(finfo.path, ios_base::binary);
 			string content((istreambuf_iterator<char>(ifs)),
 				(istreambuf_iterator<char>()));
-			finfo.hash = md5(content);
+			SHA256 sha256;
+			finfo.md5 = md5(content);
+			finfo.sha2 = sha256(content);
 			ifs.close();
 			vec_finfo.push_back(finfo);
 		}
@@ -103,7 +109,8 @@ void print_finfo_vec(vector<Fileinfo> vec) {
 	for (Fileinfo element : vec) {
 		cout << element.path << endl <<
 			element.size << endl <<
-			element.hash << endl <<
+			element.md5 << endl <<
+			element.sha2 << endl <<
 			element.flag << endl << "-------" << endl;
 	}
 }
@@ -144,3 +151,4 @@ int main() {
 	}
 	return 0;
 }
+
