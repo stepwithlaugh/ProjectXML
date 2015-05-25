@@ -6,6 +6,7 @@
 #include "tinyxml2.cpp"
 #include "md5.h"
 #include "sha256.h"
+#include "pbfile.pb.h" //файл, который сделал protoc
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -17,6 +18,47 @@ struct Fileinfo {
 	int size;
 	string flag = "NEW";
 };
+
+void savepbuf(std::string filename, std::vector<Fileinfo> & vec_finfo) {
+	nsofdir::ArrFilep flist;
+	nsofdir::Filep * file_entry;
+	std::ofstream output(filename, std::ofstream::binary);
+	for (Fileinfo it : vec_finfo) {
+		//Запись, просто по сделанным методам протобафа
+		file_entry = flist.add_filep();
+		file_entry->set_filepath(it.path);
+		file_entry->set_size(it.size);
+		file_entry->set_mdsixhash(it.hash);
+
+	}
+	//Вывод файла
+	flist.PrintDebugString();
+	//Записываем в output файл
+	flist.SerializeToOstream(&output);
+	output.close();
+}
+
+void loadpbuf(std::string filename, std::vector<Fileinfo> & vec_finfo) {
+	//вспомогательная структура Fileinfo, через которую заполним вектор
+	Fileinfo it;
+	//Filelist, в который считаем файл
+	nsofdir::ArrFilep flist;  
+	nsofdir::Filep file_entry;
+	// Открываем наш записанный файл
+	std::ifstream input(filename, std::ofstream::binary); 
+	//Парсим из файла
+	flist.ParseFromIstream(&input);  
+	input.close();
+	//flist.PrintDebugString(); // Вывод файла
+	file_entry.PrintDebugString();
+	for (int i = 0; i < flist.filep_size(); i++) {
+		file_entry = flist.filep(i);
+		it.path = file_entry.filepath();
+		it.size = file_entry.size();
+		it.hash = file_entry.mdsixhash();
+		vec_finfo.push_back(it);
+	}
+}
 
 vector<Fileinfo> compare_lists(vector<Fileinfo> newfl, vector<Fileinfo> oldfl) {
 	for (vector<Fileinfo>::iterator itnew = newfl.begin(); itnew < newfl.end(); itnew++) {
@@ -124,7 +166,8 @@ int main() {
 	ifstream ifs;
 	string checkstatus;
 	cout << "Do you wish to save filelist or check current folder with previous result?" <<
-		endl << "(check/save or anything else for neither)" << endl;
+		endl << "(check/save or anything else for neither)" <<
+		"checkpb/savepb for protobuf option" << endl;
 	getline(cin, checkstatus);
 	cout << "Folder path:" << endl;
 	getline(cin, path);
@@ -148,6 +191,14 @@ int main() {
 	}
 	if ((checkstatus != "save") && (checkstatus != "check")) {
 		print_finfo_vec(vec_finfo);
+	}
+		if (checkstatus == "savepb") {
+		savepbuf("filelist.pb", vec_finfo);
+		print_finfo_vec(vec_finfo);
+	}
+		if (checkstatus == "checkpb") {
+		loadpbuf("filelist.pb", vec_finfo_old);
+		print_finfo_vec(compare_lists(vec_finfo, vec_finfo_old));
 	}
 	return 0;
 }
